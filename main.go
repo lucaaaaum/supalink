@@ -27,54 +27,56 @@ const (
 const regexConstants = ".*+?[]()|{}"
 
 var rootCmd = &cobra.Command{
-	Use:  "supalink <source path template> <destination path template>",
+	Use:  "supalink <source path regex> <destination path template>",
 	Args: cobra.ExactArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		srcPath := args[0]
-
-		if !strings.HasSuffix(srcPath, "$") {
-			srcPath += "$"
-		}
-
-		srcExp := regexp.MustCompile(srcPath)
 		destPath := args[1]
 
-		fmt.Println("Source Path:", srcPath)
-		fmt.Println("Destination Path:", destPath)
+		addStopSuffixToPattern(&srcPath)
 
-		rootDirectory := findRootDirectory(srcPath)
-		fmt.Println("Root Directory:", rootDirectory)
+		matchingPathsAndDestinations := getMatchingPathsAndDestinations(srcPath, destPath)
 
-		filepath.Walk(rootDirectory, func(path string, info fs.FileInfo, err error) error {
-			if err != nil {
-				return err
-			}
-
-			if matches := srcExp.FindStringSubmatch(path); matches != nil {
-				destPathFilled := destPath
-				replacer := regexp.MustCompile(`\$([0-9]+)`)
-
-				for matchIndex, match := range matches[1:] {
-					fmt.Println("Replacing match:", matchIndex+1, "with", match)
-					destPathFilled = replacer.ReplaceAllStringFunc(destPathFilled, func(s string) string {
-						index, err := strconv.Atoi(s[1:])
-						if err != nil {
-							return s
-						}
-						return matches[index]
-					})
-					fmt.Println("Destination Path after replacement:", destPathFilled)
-				}
-
-				fmt.Println("Matched:", path)
-				return nil
-			}
-
+		if len(matchingPathsAndDestinations) == 0 {
+			fmt.Println("No matching paths found.")
 			return nil
-		})
+		}
+
+		for path, destination := range matchingPathsAndDestinations {
+			fmt.Printf("%s -> %s\n", path, destination)
+		}
 
 		return nil
 	},
+}
+
+func addStopSuffixToPattern(pattern *string) {
+	if !strings.HasSuffix(*pattern, "$") {
+		*pattern += "$"
+	}
+}
+
+func getMatchingPathsAndDestinations(srcPath, destPath string) map[string]string {
+	matchingPathsAndDestinations := make(map[string]string)
+	rootDirectory := findRootDirectory(srcPath)
+
+	srcExp := regexp.MustCompile(srcPath)
+
+	filepath.Walk(rootDirectory, func(path string, info fs.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		if matches := srcExp.FindStringSubmatch(path); matches != nil {
+			parameterMatches := matches[1:]
+			destPathWithFilledParameters := getDestPathWithFilledParameters(destPath, parameterMatches)
+			matchingPathsAndDestinations[path] = destPathWithFilledParameters
+			return nil
+		}
+
+		return nil
+	})
+	return matchingPathsAndDestinations
 }
 
 func findRootDirectory(path string) string {
@@ -84,6 +86,17 @@ func findRootDirectory(path string) string {
 		}
 	}
 	return filepath.Dir(path)
+}
+
+func getDestPathWithFilledParameters(destPath string, parameterMatches []string) string {
+	parameterExp := regexp.MustCompile(`\$([0-9]+)`)
+	return parameterExp.ReplaceAllStringFunc(destPath, func(s string) string {
+		index, err := strconv.Atoi(s[1:])
+		if err != nil {
+			return s
+		}
+		return parameterMatches[index-1]
+	})
 }
 
 func main() {
