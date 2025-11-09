@@ -138,6 +138,8 @@ func findRootDirectory(path string) string {
 
 func getDestPathWithFilledParameters(destPath string, parameterMatches []string, settings settings) string {
 	printIfVerbose(settings, "Filling parameters for destination path: %s\n", destPath)
+	printIfVerbose(settings, "Parameter matches: %v\n", parameterMatches)
+
 	parameterExp := regexp.MustCompile(`\$([0-9]+)`)
 	return parameterExp.ReplaceAllStringFunc(destPath, func(s string) string {
 		index, err := strconv.Atoi(s[1:])
