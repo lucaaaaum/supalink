@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"io/fs"
+	"os"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -33,6 +34,7 @@ type settings struct {
 	Recursive bool
 	Verbose   bool
 	Confirm   bool
+	DryRun    bool
 	Steps     []int
 }
 
@@ -57,9 +59,7 @@ var rootCmd = &cobra.Command{
 			return nil
 		}
 
-		for path, destination := range matchingPathsAndDestinations {
-			fmt.Printf("%s -> %s\n", path, destination)
-		}
+		createSymlinks(matchingPathsAndDestinations, settings)
 
 		return nil
 	},
@@ -70,6 +70,7 @@ func getSettings(flags *pflag.FlagSet) (settings, error) {
 		Recursive: flags.Changed(RecursiveFlag) && flags.Lookup(RecursiveFlag).Value.String() == "true",
 		Verbose:   flags.Changed(VerboseFlag) && flags.Lookup(VerboseFlag).Value.String() == "true",
 		Confirm:   flags.Changed(ConfirmFlag) && flags.Lookup(ConfirmFlag).Value.String() == "true",
+		DryRun:    flags.Changed(DryRunFlag) && flags.Lookup(DryRunFlag).Value.String() == "true",
 		Steps:     make([]int, 0),
 	}
 	stepsAsStringArray, err := flags.GetStringArray(StepFlag)
@@ -148,6 +149,38 @@ func getDestPathWithFilledParameters(destPath string, parameterMatches []string,
 		}
 		return parameterMatches[index-1]
 	})
+}
+
+func createSymlinks(matchingPathsAndDestinations map[string]string, settings settings) {
+	fmt.Println("The following symlinks will be created:")
+	for source, destination := range matchingPathsAndDestinations {
+		fmt.Printf("%s -> %s\n", source, destination)
+	}
+
+	if settings.DryRun {
+		fmt.Println("Dry run enabled, no symlinks will be created.")
+		return
+	}
+
+	if settings.Confirm {
+		var response string
+		fmt.Print("Are you sure you want to create these symlinks? (y/n): ")
+		fmt.Scanln(&response)
+		if strings.ToLower(response) != "y" {
+			fmt.Println("Operation cancelled by user.")
+			return
+		}
+	}
+
+	for source, destination := range matchingPathsAndDestinations {
+		os.MkdirAll(filepath.Dir(destination), os.ModePerm)
+		err := os.Symlink(source, destination)
+		if err != nil {
+			fmt.Printf("Failed to create symlink: %s -> %s. Error: %v\n", source, destination, err)
+		} else {
+			printIfVerbose(settings, "Symlink created: %s -> %s\n", source, destination)
+		}
+	}
 }
 
 func main() {
