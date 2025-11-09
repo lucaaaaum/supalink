@@ -8,7 +8,7 @@
   outputs =
     { self, nixpkgs }:
     let
-      version = "0.0.1";
+      version = "1.0.0";
       supportedSystems = [
         "x86_64-linux"
         "x86_64-darwin"
