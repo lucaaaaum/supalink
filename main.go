@@ -38,6 +38,35 @@ type settings struct {
 	Steps     []int
 }
 
+type stepManager struct {
+	currentStep      int
+	currentStepCount int
+}
+
+func (sm *stepManager) NextStep(settings settings) (int, int, error) {
+	if len(settings.Steps) == 0 {
+		return 0, 0, fmt.Errorf("no steps defined")
+	}
+
+	if sm.currentStep == 0 {
+		sm.currentStep = 1
+		sm.currentStepCount = 1
+		return sm.currentStep, sm.currentStepCount, nil
+	}
+
+	if sm.currentStepCount >= settings.Steps[sm.currentStep-1] {
+		if sm.currentStep >= len(settings.Steps) {
+			return 0, 0, fmt.Errorf("exceeded the number of defined steps")
+		}
+		sm.currentStep++
+		sm.currentStepCount = 1
+	} else {
+		sm.currentStepCount++
+	}
+
+	return sm.currentStep, sm.currentStepCount, nil
+}
+
 var rootCmd = &cobra.Command{
 	Use:  "supalink <source path regex> <destination path template>",
 	Args: cobra.ExactArgs(2),
@@ -103,6 +132,8 @@ func getMatchingPathsAndDestinations(srcPath, destPath string, settings settings
 
 	srcExp := regexp.MustCompile(srcPath)
 
+	stepManager := &stepManager{}
+
 	filepath.Walk(rootDirectory, func(path string, info fs.FileInfo, err error) error {
 		if err != nil {
 			return err
@@ -111,7 +142,7 @@ func getMatchingPathsAndDestinations(srcPath, destPath string, settings settings
 		if matches := srcExp.FindStringSubmatch(path); matches != nil {
 			printIfVerbose(settings, "Path matched: %s\n", path)
 			parameterMatches := matches[1:]
-			destPathWithFilledParameters := getDestPathWithFilledParameters(destPath, parameterMatches, settings)
+			destPathWithFilledParameters := getDestPathWithFilledParameters(destPath, parameterMatches, settings, stepManager)
 			matchingPathsAndDestinations[path] = destPathWithFilledParameters
 			return nil
 		}
@@ -137,18 +168,41 @@ func findRootDirectory(path string) string {
 	return filepath.Dir(path)
 }
 
-func getDestPathWithFilledParameters(destPath string, parameterMatches []string, settings settings) string {
+func getDestPathWithFilledParameters(destPath string, parameterMatches []string, settings settings, stepManager *stepManager) string {
 	printIfVerbose(settings, "Filling parameters for destination path: %s\n", destPath)
 	printIfVerbose(settings, "Parameter matches: %v\n", parameterMatches)
 
-	parameterExp := regexp.MustCompile(`\$([0-9]+)`)
-	return parameterExp.ReplaceAllStringFunc(destPath, func(s string) string {
+	parameterExp := regexp.MustCompile(`\$[0-9]+`)
+	destPathWithFilledParameters := parameterExp.ReplaceAllStringFunc(destPath, func(s string) string {
 		index, err := strconv.Atoi(s[1:])
 		if err != nil {
 			return s
 		}
 		return parameterMatches[index-1]
 	})
+
+	if len(settings.Steps) == 0 {
+		return destPathWithFilledParameters
+	}
+
+	step, stepCount, err := stepManager.NextStep(settings)
+	if err != nil {
+		printIfVerbose(settings, "Error getting next step: %v\n", err)
+	}
+
+	stepCountParameterExp := regexp.MustCompile(`\$STEP_COUNT`)
+	destPathWithFilledParameters = stepCountParameterExp.ReplaceAllStringFunc(destPathWithFilledParameters, func(s string) string {
+		printIfVerbose(settings, "Filling step count parameter: %d\n", stepCount)
+		return strconv.Itoa(stepCount)
+	})
+
+	stepParameterExp := regexp.MustCompile(`\$STEP`)
+	destPathWithFilledParameters = stepParameterExp.ReplaceAllStringFunc(destPathWithFilledParameters, func(s string) string {
+		printIfVerbose(settings, "Filling step parameter: %d\n", step)
+		return strconv.Itoa(step)
+	})
+
+	return destPathWithFilledParameters
 }
 
 func createSymlinks(matchingPathsAndDestinations map[string]string, settings settings) {
