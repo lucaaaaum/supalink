@@ -87,7 +87,7 @@ Because I'm a [nix](https://nixos.org/) nerd, you can install *supalink* using t
 ## Roadmap
 
 - [ ] Use [Charm's](https://github.com/charmbracelet) toolset to make *supalink* prettier;
-- [ ] Actually implement Step functionality (it's on the example but it's not working lol);
+- [X] Actually implement Step functionality (it's on the example but it's not working lol);
 - [ ] Improve user experience:
     - [ ] Make it so the user doesn't have to add quote marks on input;
     - [ ] Make it so the user doesn't have to escape RegEx characters that shouldn't be treated as RegEx (brackets on torrent maintainers names, dots, dashes, etc.);
