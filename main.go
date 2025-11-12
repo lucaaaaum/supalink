@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/charmbracelet/lipgloss/tree"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 )
@@ -40,6 +41,7 @@ type settings struct {
 	Confirm bool
 	DryRun  bool
 	Steps   []int
+	Format  string
 }
 
 type stepManager struct {
@@ -103,6 +105,7 @@ func getSettings(flags *pflag.FlagSet) (settings, error) {
 		Verbose: flags.Changed(VerboseFlag) && flags.Lookup(VerboseFlag).Value.String() == "true",
 		Confirm: flags.Changed(ConfirmFlag) && flags.Lookup(ConfirmFlag).Value.String() == "true",
 		DryRun:  flags.Changed(DryRunFlag) && flags.Lookup(DryRunFlag).Value.String() == "true",
+		Format:  flags.Lookup(FormatFlag).Value.String(),
 		Steps:   make([]int, 0),
 	}
 	stepsAsStringArray, err := flags.GetStringArray(StepFlag)
@@ -209,10 +212,7 @@ func getDestPathWithFilledParameters(destPath string, parameterMatches []string,
 }
 
 func createSymlinks(matchingPathsAndDestinations map[string]string, settings settings) {
-	fmt.Println("The following symlinks will be created:")
-	for source, destination := range matchingPathsAndDestinations {
-		fmt.Printf("%s -> %s\n", source, destination)
-	}
+	printSymlinks(matchingPathsAndDestinations, settings)
 
 	if settings.DryRun {
 		fmt.Println("Dry run enabled, no symlinks will be created.")
@@ -238,6 +238,92 @@ func createSymlinks(matchingPathsAndDestinations map[string]string, settings set
 			printIfVerbose(settings, "Symlink created: %s -> %s\n", source, destination)
 		}
 	}
+}
+
+func printSymlinks(matchingPathsAndDestinations map[string]string, settings settings) {
+	printIfVerbose(settings, "Preparing to print symlinks in format: %s\n", settings.Format)
+	switch settings.Format {
+	case TreeFormat:
+		sourcePaths := make([]string, 0, len(matchingPathsAndDestinations))
+		destinationPaths := make([]string, 0, len(matchingPathsAndDestinations))
+		for source, destination := range matchingPathsAndDestinations {
+			sourcePaths = append(sourcePaths, source)
+			destinationPaths = append(destinationPaths, destination)
+		}
+
+		sourceTree := createTree(sourcePaths).toLipglossTree()
+		fmt.Println(sourceTree)
+		destinationTree := createTree(destinationPaths).toLipglossTree()
+		fmt.Println(destinationTree)
+	case TableFormat:
+	}
+}
+
+func findRootDirectoryOfAllPaths(paths []string) string {
+	if len(paths) == 0 {
+		return ""
+	}
+
+	rootDir := filepath.Dir(paths[0])
+
+	for _, path := range paths[1:] {
+		for !strings.HasPrefix(path, rootDir) {
+			rootDir = filepath.Dir(rootDir)
+		}
+	}
+
+	return rootDir
+}
+
+type node struct {
+	value    string
+	children []*node
+}
+
+func createTree(paths []string) *node {
+	rootDirectory := findRootDirectoryOfAllPaths(paths)
+	root := &node{value: rootDirectory, children: make([]*node, 0)}
+	for _, path := range paths {
+		relativePath, err := filepath.Rel(rootDirectory, path)
+		if err != nil {
+			continue
+		}
+		parts := strings.Split(relativePath, string(os.PathSeparator))
+		root.add(parts)
+	}
+	return root
+}
+
+func (n *node) add(path []string) {
+	if len(path) == 0 {
+		return
+	}
+
+	part := path[0]
+	child := n.getChild(part)
+	if child == nil {
+		child = &node{value: part, children: make([]*node, 0)}
+		n.children = append(n.children, child)
+	}
+
+	child.add(path[1:])
+}
+
+func (n *node) getChild(value string) *node {
+	for _, child := range n.children {
+		if child.value == value {
+			return child
+		}
+	}
+	return nil
+}
+
+func (n *node) toLipglossTree() tree.Node {
+	tree := tree.Root(n.value)
+	for _, child := range n.children {
+		tree.Child(child.toLipglossTree())
+	}
+	return tree
 }
 
 func main() {
