@@ -16,23 +16,30 @@ import (
 // objective: supalink src/path/.*S([0-9]{2})E([0-9]{2}).*.mkv -r destination/path/Season\ $STEP/Name (Year) S$1E$2.mkv
 
 const (
-	VerboseFlag        = "verbose"
-	VerboseFlagShort   = "v"
-	ConfirmFlag        = "confirm"
-	ConfirmFlagShort   = "c"
-	StepFlag           = "step"
-	StepFlagShort      = "s"
-	DryRunFlag         = "dry-run"
-	DryRunFlagShort    = "d"
+	VerboseFlag      = "verbose"
+	VerboseFlagShort = "v"
+	ConfirmFlag      = "confirm"
+	ConfirmFlagShort = "c"
+	StepFlag         = "step"
+	StepFlagShort    = "s"
+	DryRunFlag       = "dry-run"
+	DryRunFlagShort  = "d"
+	FormatFlag       = "format"
+	FormatFlagShort  = "f"
+)
+
+const (
+	TreeFormat  = "tree"
+	TableFormat = "table"
 )
 
 const regexConstants = ".*+?[]()|{}"
 
 type settings struct {
-	Verbose   bool
-	Confirm   bool
-	DryRun    bool
-	Steps     []int
+	Verbose bool
+	Confirm bool
+	DryRun  bool
+	Steps   []int
 }
 
 type stepManager struct {
@@ -93,10 +100,10 @@ var rootCmd = &cobra.Command{
 
 func getSettings(flags *pflag.FlagSet) (settings, error) {
 	settings := settings{
-		Verbose:   flags.Changed(VerboseFlag) && flags.Lookup(VerboseFlag).Value.String() == "true",
-		Confirm:   flags.Changed(ConfirmFlag) && flags.Lookup(ConfirmFlag).Value.String() == "true",
-		DryRun:    flags.Changed(DryRunFlag) && flags.Lookup(DryRunFlag).Value.String() == "true",
-		Steps:     make([]int, 0),
+		Verbose: flags.Changed(VerboseFlag) && flags.Lookup(VerboseFlag).Value.String() == "true",
+		Confirm: flags.Changed(ConfirmFlag) && flags.Lookup(ConfirmFlag).Value.String() == "true",
+		DryRun:  flags.Changed(DryRunFlag) && flags.Lookup(DryRunFlag).Value.String() == "true",
+		Steps:   make([]int, 0),
 	}
 	stepsAsStringArray, err := flags.GetStringArray(StepFlag)
 	if err != nil {
@@ -239,5 +246,6 @@ func main() {
 	flags.BoolP(ConfirmFlag, ConfirmFlagShort, false, "Asks for user confirmation before creating symlinks")
 	flags.BoolP(DryRunFlag, DryRunFlagShort, false, "Perform a trial run with no changes made")
 	flags.StringArrayP(StepFlag, StepFlagShort, make([]string, 0), "Step number to break destination path into subdirectories")
+	flags.StringP(FormatFlag, FormatFlagShort, TreeFormat, "Format of the destination path")
 	rootCmd.Execute()
 }
