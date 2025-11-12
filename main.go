@@ -16,8 +16,6 @@ import (
 // objective: supalink src/path/.*S([0-9]{2})E([0-9]{2}).*.mkv -r destination/path/Season\ $STEP/Name (Year) S$1E$2.mkv
 
 const (
-	RecursiveFlag      = "recursive"
-	RecursiveFlagShort = "r"
 	VerboseFlag        = "verbose"
 	VerboseFlagShort   = "v"
 	ConfirmFlag        = "confirm"
@@ -31,7 +29,6 @@ const (
 const regexConstants = ".*+?[]()|{}"
 
 type settings struct {
-	Recursive bool
 	Verbose   bool
 	Confirm   bool
 	DryRun    bool
@@ -96,7 +93,6 @@ var rootCmd = &cobra.Command{
 
 func getSettings(flags *pflag.FlagSet) (settings, error) {
 	settings := settings{
-		Recursive: flags.Changed(RecursiveFlag) && flags.Lookup(RecursiveFlag).Value.String() == "true",
 		Verbose:   flags.Changed(VerboseFlag) && flags.Lookup(VerboseFlag).Value.String() == "true",
 		Confirm:   flags.Changed(ConfirmFlag) && flags.Lookup(ConfirmFlag).Value.String() == "true",
 		DryRun:    flags.Changed(DryRunFlag) && flags.Lookup(DryRunFlag).Value.String() == "true",
@@ -239,7 +235,6 @@ func createSymlinks(matchingPathsAndDestinations map[string]string, settings set
 
 func main() {
 	flags := rootCmd.Flags()
-	flags.BoolP(RecursiveFlag, RecursiveFlagShort, false, "Search source path recursively")
 	flags.BoolP(VerboseFlag, VerboseFlagShort, false, "Enable verbose output (good for debugging)")
 	flags.BoolP(ConfirmFlag, ConfirmFlagShort, false, "Asks for user confirmation before creating symlinks")
 	flags.BoolP(DryRunFlag, DryRunFlagShort, false, "Perform a trial run with no changes made")
