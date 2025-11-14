@@ -79,7 +79,7 @@ Because I'm a [nix](https://nixos.org/) nerd, you can install *supalink* using t
   inputs.supalink.url = "github:lucaaaaum/supalink";
 
   yourPackageSource* = [
-    inputs.supalink.packages.${pkgs.system}.supalink
+    inputs.supalink.packages.${yourPackageSource.system}.supalink
   ];
 }
 ```
