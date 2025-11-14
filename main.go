@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -74,6 +75,10 @@ func (sm *stepManager) NextStep(settings settings) (int, int, error) {
 
 	return sm.currentStep, sm.currentStepCount, nil
 }
+
+const (
+	accentColor = lipgloss.Color("3")
+)
 
 var rootCmd = &cobra.Command{
 	Use:  "supalink <source path regex> <destination path template>",
@@ -254,9 +259,18 @@ func printSymlinks(matchingPathsAndDestinations map[string]string, settings sett
 		}
 
 		sourceTree := createTree(sourcePaths).toLipglossTree()
-		fmt.Println(sourceTree)
 		destinationTree := createTree(destinationPaths).toLipglossTree()
-		fmt.Println(destinationTree)
+
+		table := table.
+			New().
+			Headers("Source", "Destination").
+			Border(lipgloss.RoundedBorder()).
+			BorderStyle(lipgloss.NewStyle().Foreground(accentColor)).
+			StyleFunc(func(row, col int) lipgloss.Style {
+				return lipgloss.NewStyle().Padding(0, 1)
+			}).
+			Rows([]string{fmt.Sprintln(sourceTree), fmt.Sprintln(destinationTree)})
+		fmt.Println(table)
 	case TableFormat:
 	}
 }
@@ -321,6 +335,10 @@ func (n *node) getChild(value string) *node {
 }
 
 func (n *node) toLipglossTree() tree.Node {
+	if len(n.value) >= 25 {
+		extension := path.Ext(n.value)
+		n.value = n.value[:20] + "(...)" + extension
+	}
 	tree := tree.Root(n.value)
 	for _, child := range n.children {
 		tree.Child(child.toLipglossTree())
