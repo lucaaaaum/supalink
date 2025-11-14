@@ -41,9 +41,9 @@ supalink "/path/to/downloads/\[TorrentMaintainer\] Video/.*\.mkv" "/path/to/libr
 Yeah so RegEx is a funny thing. You can write it, but it's really, really hard to read it. What we're doing there basically tells *supalink* to:
 
 1. Go to the directory `/path/to/downloads/[TorrentMaintainer] Video`
-2. Search for all files that match the RegEx `.*Episode \d+\.mkv` (which is all files that end with "Episode X.mkv", where X is a number of any size)
+2. Search for all files that match the RegEx `.*\.mkv` (all MKV files, basically)
 3. For each file found, create a symlink in `/path/to/library/Video/Season $STEP/Video S$STEPE$STEP_COUNT.mkv`, where:
-   - `$STEP` is the current season number (starting from 1)
+   - `$STEP` is the current season number (starts counting from 1)
    - `$STEP_COUNT` is the total number of episodes processed so far
 
 You'll understand more the more you use it. So, for testing purposes, you can always use
