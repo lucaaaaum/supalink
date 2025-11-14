@@ -9,6 +9,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/lipgloss/table"
 	"github.com/charmbracelet/lipgloss/tree"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
