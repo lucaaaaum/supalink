@@ -31,7 +31,7 @@ But you actually want this:
 You can do this with *supalink* like so:
 
 ```bash
-supalink "/path/to/downloads/\[TorrentMaintainer\] Video/.*Episode \d+\.mkv" "/path/to/library/Video/Season \$STEP/Video S\$STEPE\$STEP_COUNT.mkv -step 2 2"
+supalink "/path/to/downloads/\[TorrentMaintainer\] Video/.*\.mkv" "/path/to/library/Video/Season \$STEP/Video S\$STEPE\$STEP_COUNT.mkv" --step 2 --step 2
 ```
 
 > But this looks ridiculous! What on Earth is going on?
@@ -46,20 +46,6 @@ Yeah so RegEx is a funny thing. You can write it, but it's really, really hard t
    - `$STEP` is the current season number (starting from 1)
    - `$STEP_COUNT` is the total number of episodes processed so far
 
-### I still need more explanation
-
-You can always check the available flags and their descriptions with
-
-```bash
-supalink --help
-```
-
-or even
-
-```bash
-supalink -h
-```
-
 You'll understand more the more you use it. So, for testing purposes, you can always use
 
 ```bash
@@ -67,6 +53,22 @@ supalink --dry-run
 ```
 
 which runs supalink but does not actually make any symlinks.
+
+And, if you're unsure on how the links will actually end-up like, you can also just run
+
+```bash
+supalink --confirm
+```
+
+which will ask for confirmation before creating any symlinks.
+
+### I still need more explanation
+
+You can always check the available flags and their descriptions with
+
+```bash
+supalink --help
+```
 
 ## Installation
 
