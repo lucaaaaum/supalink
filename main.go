@@ -270,7 +270,12 @@ func printSymlinks(matchingPathsAndDestinations map[string]string, settings sett
 			Border(lipgloss.RoundedBorder()).
 			BorderStyle(lipgloss.NewStyle().Foreground(accentColor)).
 			StyleFunc(func(row, col int) lipgloss.Style {
-				return lipgloss.NewStyle().Padding(0, 1)
+				style := lipgloss.NewStyle().Padding(0, 1)
+				if row == table.HeaderRow {
+					style = style.Bold(true).Foreground(accentColor)
+				}
+
+				return style
 			}).
 			Rows([]string{fmt.Sprintln(sourceTree), fmt.Sprintln(destinationTree)})
 		fmt.Println(table)
@@ -397,9 +402,9 @@ func (n *node) getChild(value string) *node {
 }
 
 func (n *node) toLipglossTree() tree.Node {
-	if len(n.value) >= 25 {
+	if len(n.value) >= 45 {
 		extension := path.Ext(n.value)
-		n.value = n.value[:20] + "(...)" + extension
+		n.value = n.value[:40] + "(...)" + extension
 	}
 	tree := tree.Root(n.value)
 	for _, child := range n.children {
