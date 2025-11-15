@@ -7,6 +7,7 @@ import (
 	"path"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -295,15 +296,38 @@ func printSymlinks(matchingPathsAndDestinations map[string]string, settings sett
 				return style
 			})
 
+		allPaths := make([]string, 0)
 		for source, destination := range matchingPathsAndDestinations {
-			if len(source) > 25 {
+			allPaths = append(allPaths, source, destination)
+		}
+		rootDirectory := findRootDirectoryOfAllPaths(allPaths)
+
+		printIfVerbose(settings, "All paths contain root directory: %s\n", rootDirectory)
+
+		orderedMatchingPathsAndDestinations := make(map[string]string, 0)
+		orderedSources := make([]string, 0)
+
+		for source := range matchingPathsAndDestinations {
+			orderedSources = append(orderedSources, source)
+		}
+
+		sort.Strings(orderedSources)
+		for _, source := range orderedSources {
+			orderedMatchingPathsAndDestinations[source] = matchingPathsAndDestinations[source]
+		}
+
+		for source, destination := range orderedMatchingPathsAndDestinations {
+			source = strings.TrimPrefix(source, rootDirectory+string(os.PathSeparator))
+			destination = strings.TrimPrefix(destination, rootDirectory+string(os.PathSeparator))
+
+			if len(source) > 45 {
 				extension := path.Ext(source)
-				source = source[:20] + "(...)" + extension
+				source = source[:40] + "(...)" + extension
 			}
 
-			if len(destination) > 25 {
+			if len(destination) > 45 {
 				extension := path.Ext(destination)
-				destination = destination[:20] + "(...)" + extension
+				destination = destination[:40] + "(...)" + extension
 			}
 
 			table.Row(source, destination)
