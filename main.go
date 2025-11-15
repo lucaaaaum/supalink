@@ -4,11 +4,16 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 
+	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/lipgloss/table"
+	"github.com/charmbracelet/lipgloss/tree"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 )
@@ -16,26 +21,31 @@ import (
 // objective: supalink src/path/.*S([0-9]{2})E([0-9]{2}).*.mkv -r destination/path/Season\ $STEP/Name (Year) S$1E$2.mkv
 
 const (
-	RecursiveFlag      = "recursive"
-	RecursiveFlagShort = "r"
-	VerboseFlag        = "verbose"
-	VerboseFlagShort   = "v"
-	ConfirmFlag        = "confirm"
-	ConfirmFlagShort   = "c"
-	StepFlag           = "step"
-	StepFlagShort      = "s"
-	DryRunFlag         = "dry-run"
-	DryRunFlagShort    = "d"
+	VerboseFlag      = "verbose"
+	VerboseFlagShort = "v"
+	ConfirmFlag      = "confirm"
+	ConfirmFlagShort = "c"
+	StepFlag         = "step"
+	StepFlagShort    = "s"
+	DryRunFlag       = "dry-run"
+	DryRunFlagShort  = "d"
+	FormatFlag       = "format"
+	FormatFlagShort  = "f"
+)
+
+const (
+	TreeFormat  = "tree"
+	TableFormat = "table"
 )
 
 const regexConstants = ".*+?[]()|{}"
 
 type settings struct {
-	Recursive bool
-	Verbose   bool
-	Confirm   bool
-	DryRun    bool
-	Steps     []int
+	Verbose bool
+	Confirm bool
+	DryRun  bool
+	Steps   []int
+	Format  string
 }
 
 type stepManager struct {
@@ -67,6 +77,12 @@ func (sm *stepManager) NextStep(settings settings) (int, int, error) {
 	return sm.currentStep, sm.currentStepCount, nil
 }
 
+const (
+	accentColor    = lipgloss.Color("3")
+	whiteColor     = lipgloss.Color("255")
+	lightGrayColor = lipgloss.Color("245")
+)
+
 var rootCmd = &cobra.Command{
 	Use:  "supalink <source path regex> <destination path template>",
 	Args: cobra.ExactArgs(2),
@@ -96,11 +112,11 @@ var rootCmd = &cobra.Command{
 
 func getSettings(flags *pflag.FlagSet) (settings, error) {
 	settings := settings{
-		Recursive: flags.Changed(RecursiveFlag) && flags.Lookup(RecursiveFlag).Value.String() == "true",
-		Verbose:   flags.Changed(VerboseFlag) && flags.Lookup(VerboseFlag).Value.String() == "true",
-		Confirm:   flags.Changed(ConfirmFlag) && flags.Lookup(ConfirmFlag).Value.String() == "true",
-		DryRun:    flags.Changed(DryRunFlag) && flags.Lookup(DryRunFlag).Value.String() == "true",
-		Steps:     make([]int, 0),
+		Verbose: flags.Changed(VerboseFlag) && flags.Lookup(VerboseFlag).Value.String() == "true",
+		Confirm: flags.Changed(ConfirmFlag) && flags.Lookup(ConfirmFlag).Value.String() == "true",
+		DryRun:  flags.Changed(DryRunFlag) && flags.Lookup(DryRunFlag).Value.String() == "true",
+		Format:  flags.Lookup(FormatFlag).Value.String(),
+		Steps:   make([]int, 0),
 	}
 	stepsAsStringArray, err := flags.GetStringArray(StepFlag)
 	if err != nil {
@@ -206,10 +222,7 @@ func getDestPathWithFilledParameters(destPath string, parameterMatches []string,
 }
 
 func createSymlinks(matchingPathsAndDestinations map[string]string, settings settings) {
-	fmt.Println("The following symlinks will be created:")
-	for source, destination := range matchingPathsAndDestinations {
-		fmt.Printf("%s -> %s\n", source, destination)
-	}
+	printSymlinks(matchingPathsAndDestinations, settings)
 
 	if settings.DryRun {
 		fmt.Println("Dry run enabled, no symlinks will be created.")
@@ -237,12 +250,175 @@ func createSymlinks(matchingPathsAndDestinations map[string]string, settings set
 	}
 }
 
+func printSymlinks(matchingPathsAndDestinations map[string]string, settings settings) {
+	printIfVerbose(settings, "Preparing to print symlinks in format: %s\n", settings.Format)
+	switch settings.Format {
+	case TreeFormat:
+		sourcePaths := make([]string, 0, len(matchingPathsAndDestinations))
+		destinationPaths := make([]string, 0, len(matchingPathsAndDestinations))
+		for source, destination := range matchingPathsAndDestinations {
+			sourcePaths = append(sourcePaths, source)
+			destinationPaths = append(destinationPaths, destination)
+		}
+
+		sourceTree := createTree(sourcePaths).toLipglossTree()
+		destinationTree := createTree(destinationPaths).toLipglossTree()
+
+		table := table.
+			New().
+			Headers("Source", "Destination").
+			Border(lipgloss.RoundedBorder()).
+			BorderStyle(lipgloss.NewStyle().Foreground(accentColor)).
+			StyleFunc(func(row, col int) lipgloss.Style {
+				style := lipgloss.NewStyle().Padding(0, 1)
+				if row == table.HeaderRow {
+					style = style.Bold(true).Foreground(accentColor)
+				}
+
+				return style
+			}).
+			Rows([]string{fmt.Sprintln(sourceTree), fmt.Sprintln(destinationTree)})
+		fmt.Println(table)
+	case TableFormat:
+		table := table.
+			New().
+			Headers("Source", "Destination").
+			Border(lipgloss.RoundedBorder()).
+			BorderStyle(lipgloss.NewStyle().Foreground(accentColor)).
+			StyleFunc(func(row, col int) lipgloss.Style {
+				style := lipgloss.NewStyle().Padding(0, 1)
+
+				if row == table.HeaderRow {
+					style = style.Bold(true).Foreground(accentColor)
+					return style
+				}
+
+				if row%2 == 0 {
+					style = style.Foreground(lightGrayColor)
+				} else {
+					style = style.Foreground(whiteColor)
+				}
+				return style
+			})
+
+		allPaths := make([]string, 0)
+		for source, destination := range matchingPathsAndDestinations {
+			allPaths = append(allPaths, source, destination)
+		}
+		rootDirectory := findRootDirectoryOfAllPaths(allPaths)
+
+		printIfVerbose(settings, "All paths contain root directory: %s\n", rootDirectory)
+
+		orderedMatchingPathsAndDestinations := make(map[string]string, 0)
+		orderedSources := make([]string, 0)
+
+		for source := range matchingPathsAndDestinations {
+			orderedSources = append(orderedSources, source)
+		}
+
+		sort.Strings(orderedSources)
+		for _, source := range orderedSources {
+			orderedMatchingPathsAndDestinations[source] = matchingPathsAndDestinations[source]
+		}
+
+		for source, destination := range orderedMatchingPathsAndDestinations {
+			source = strings.TrimPrefix(source, rootDirectory+string(os.PathSeparator))
+			destination = strings.TrimPrefix(destination, rootDirectory+string(os.PathSeparator))
+
+			if len(source) > 45 {
+				extension := path.Ext(source)
+				source = source[:40] + "(...)" + extension
+			}
+
+			if len(destination) > 45 {
+				extension := path.Ext(destination)
+				destination = destination[:40] + "(...)" + extension
+			}
+
+			table.Row(source, destination)
+		}
+
+		fmt.Println(table)
+	}
+}
+
+func findRootDirectoryOfAllPaths(paths []string) string {
+	if len(paths) == 0 {
+		return ""
+	}
+
+	rootDir := filepath.Dir(paths[0])
+
+	for _, path := range paths[1:] {
+		for !strings.HasPrefix(path, rootDir) {
+			rootDir = filepath.Dir(rootDir)
+		}
+	}
+
+	return rootDir
+}
+
+type node struct {
+	value    string
+	children []*node
+}
+
+func createTree(paths []string) *node {
+	rootDirectory := findRootDirectoryOfAllPaths(paths)
+	root := &node{value: rootDirectory, children: make([]*node, 0)}
+	for _, path := range paths {
+		relativePath, err := filepath.Rel(rootDirectory, path)
+		if err != nil {
+			continue
+		}
+		parts := strings.Split(relativePath, string(os.PathSeparator))
+		root.add(parts)
+	}
+	return root
+}
+
+func (n *node) add(path []string) {
+	if len(path) == 0 {
+		return
+	}
+
+	part := path[0]
+	child := n.getChild(part)
+	if child == nil {
+		child = &node{value: part, children: make([]*node, 0)}
+		n.children = append(n.children, child)
+	}
+
+	child.add(path[1:])
+}
+
+func (n *node) getChild(value string) *node {
+	for _, child := range n.children {
+		if child.value == value {
+			return child
+		}
+	}
+	return nil
+}
+
+func (n *node) toLipglossTree() tree.Node {
+	if len(n.value) >= 45 {
+		extension := path.Ext(n.value)
+		n.value = n.value[:40] + "(...)" + extension
+	}
+	tree := tree.Root(n.value)
+	for _, child := range n.children {
+		tree.Child(child.toLipglossTree())
+	}
+	return tree
+}
+
 func main() {
 	flags := rootCmd.Flags()
-	flags.BoolP(RecursiveFlag, RecursiveFlagShort, false, "Search source path recursively")
 	flags.BoolP(VerboseFlag, VerboseFlagShort, false, "Enable verbose output (good for debugging)")
 	flags.BoolP(ConfirmFlag, ConfirmFlagShort, false, "Asks for user confirmation before creating symlinks")
 	flags.BoolP(DryRunFlag, DryRunFlagShort, false, "Perform a trial run with no changes made")
 	flags.StringArrayP(StepFlag, StepFlagShort, make([]string, 0), "Step number to break destination path into subdirectories")
+	flags.StringP(FormatFlag, FormatFlagShort, TreeFormat, "Format of the destination path")
 	rootCmd.Execute()
 }
