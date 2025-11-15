@@ -77,7 +77,9 @@ func (sm *stepManager) NextStep(settings settings) (int, int, error) {
 }
 
 const (
-	accentColor = lipgloss.Color("3")
+	accentColor    = lipgloss.Color("3")
+	whiteColor     = lipgloss.Color("255")
+	lightGrayColor = lipgloss.Color("245")
 )
 
 var rootCmd = &cobra.Command{
@@ -272,6 +274,42 @@ func printSymlinks(matchingPathsAndDestinations map[string]string, settings sett
 			Rows([]string{fmt.Sprintln(sourceTree), fmt.Sprintln(destinationTree)})
 		fmt.Println(table)
 	case TableFormat:
+		table := table.
+			New().
+			Headers("Source", "Destination").
+			Border(lipgloss.RoundedBorder()).
+			BorderStyle(lipgloss.NewStyle().Foreground(accentColor)).
+			StyleFunc(func(row, col int) lipgloss.Style {
+				style := lipgloss.NewStyle().Padding(0, 1)
+
+				if row == table.HeaderRow {
+					style = style.Bold(true).Foreground(accentColor)
+					return style
+				}
+
+				if row%2 == 0 {
+					style = style.Foreground(lightGrayColor)
+				} else {
+					style = style.Foreground(whiteColor)
+				}
+				return style
+			})
+
+		for source, destination := range matchingPathsAndDestinations {
+			if len(source) > 25 {
+				extension := path.Ext(source)
+				source = source[:20] + "(...)" + extension
+			}
+
+			if len(destination) > 25 {
+				extension := path.Ext(destination)
+				destination = destination[:20] + "(...)" + extension
+			}
+
+			table.Row(source, destination)
+		}
+
+		fmt.Println(table)
 	}
 }
 
