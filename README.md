@@ -13,7 +13,8 @@ Say we have this file structure:
 ├── [TorrentMaintainer] Video - Episode 1.mkv
 ├── [TorrentMaintainer] Video - Episode 2.mkv
 ├── [TorrentMaintainer] Video - Episode 3.mkv
-└── [TorrentMaintainer] Video - Episode 4.mkv
+├── [TorrentMaintainer] Video - Episode 4.mkv
+└── [TorrentMaintainer] Video - Episode 5.mkv
 ```
 
 But you actually want this:
@@ -25,13 +26,14 @@ But you actually want this:
 │   └── Video S01E02.mkv
 └── Season 2
     ├── Video S02E01.mkv
-    └── Video S02E02.mkv
+    ├── Video S02E02.mkv
+    └── Video S02E03.mkv
 ```
 
 You can do this with *supalink* like so:
 
 ```bash
-supalink "/path/to/downloads/\[TorrentMaintainer\] Video/.*\.mkv" "/path/to/library/Video/Season \$STEP/Video S\$STEPE\$STEP_COUNT.mkv" --step 2 --step 2
+supalink "/path/to/downloads/\[TorrentMaintainer\] Video/.*\.mkv" "/path/to/library/Video/Season \$STEP/Video S\$STEPE\$STEP_COUNT.mkv" --step 2 --step 3
 ```
 
 > But this looks ridiculous! What on Earth is going on?
